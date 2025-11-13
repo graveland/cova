@@ -1387,7 +1387,7 @@ pub fn Custom(comptime config: Config) type {
                 break :getVals try vals_list.toOwnedSlice(alloc);
             };
             defer alloc.free(vals);
-            var out: ToT = undefined;
+            var out: ToT = mem.zeroes(ToT);
             const fields = meta.fields(ToT);
             inline for (fields) |field| {
                 if (field.type == @This() or field.type == OptionT or field.type == ValueT) continue;
