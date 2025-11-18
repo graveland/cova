@@ -39,6 +39,7 @@ pub fn CommandTemplate(CommandT: type) type {
 
         /// Create a Template from a Command (`cmd`) using the provided Argument Template Config (`at_config`).
         pub fn from(comptime cmd: CommandT, comptime at_config: ArgTemplateConfig) @This() {
+            @setEvalBranchQuota(10000);
             return .{
                 .name = cmd.name,
                 .description = cmd.description,
