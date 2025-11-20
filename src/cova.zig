@@ -475,16 +475,16 @@ fn parseArgsCtx(
                     for (long_names[0..long_names_len]) |long_name| {
                         if (matchOpt: {
                             break :matchOpt if (opt.case_sensitive) //
-                                mem.eql(u8, long_opt, long_name) or //
+                                utils.eqlNormalized(long_opt, long_name) or //
                                 ( //
                                     OptionT.allow_abbreviated_long_opts and //
-                                    mem.indexOf(u8, long_name, long_opt) != null and long_name[0] == long_opt[0] //
+                                    utils.indexOfNormalized(long_name, long_opt) != null and long_name[0] == long_opt[0] //
                                 ) //
                             else //
-                                ascii.eqlIgnoreCase(long_opt, long_name) or //
+                                utils.eqlIgnoreCaseNormalized(long_opt, long_name) or //
                                 ( //
                                     OptionT.allow_abbreviated_long_opts and  //
-                                    ascii.indexOfIgnoreCase(long_name, long_opt) != null and  //
+                                    utils.indexOfIgnoreCaseNormalized(long_name, long_opt) != null and  //
                                     ascii.eqlIgnoreCase(long_name[0..1], long_opt[0..1]) //
                                 );
                         }) {

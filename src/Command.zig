@@ -1644,8 +1644,8 @@ pub fn Custom(comptime config: Config) type {
                         distinct_short[idx + idx_offset] = opt.short_name orelse ' ';
                         if (opt.long_name) |long_name| {
                             if (
-                                (opt.case_sensitive and utils.indexOfEql([]const u8, distinct_long[0..], long_name) != null) or
-                                (!opt.case_sensitive and utils.indexOfEqlIgnoreCase(distinct_long[0..], long_name) != null)
+                                (opt.case_sensitive and utils.indexOfEqlNormalized(distinct_long[0..], long_name) != null) or
+                                (!opt.case_sensitive and utils.indexOfEqlIgnoreCaseNormalized(distinct_long[0..], long_name) != null)
                             ) @compileError("The Option Long Name '" ++ long_name ++ "' is set more than once.");
                         }
                         distinct_long[idx + idx_offset] = opt.long_name orelse "a!garbage@long#name$";

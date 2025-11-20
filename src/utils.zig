@@ -12,6 +12,55 @@ const Command = @import("Command.zig");
 const Option = @import("Option.zig");
 const Value = @import("Value.zig");
 
+/// Compare two strings treating underscores and hyphens as equivalent
+pub fn eqlNormalized(a: []const u8, b: []const u8) bool {
+    if (a.len != b.len) return false;
+    for (a, b) |char_a, char_b| {
+        const norm_a = if (char_a == '_') '-' else char_a;
+        const norm_b = if (char_b == '_') '-' else char_b;
+        if (norm_a != norm_b) return false;
+    }
+    return true;
+}
+
+/// Compare two strings case-insensitively, treating underscores and hyphens as equivalent
+pub fn eqlIgnoreCaseNormalized(a: []const u8, b: []const u8) bool {
+    if (a.len != b.len) return false;
+    for (a, b) |char_a, char_b| {
+        const norm_a = if (char_a == '_') '-' else char_a;
+        const norm_b = if (char_b == '_') '-' else char_b;
+        if (ascii.toLower(norm_a) != ascii.toLower(norm_b)) return false;
+    }
+    return true;
+}
+
+/// Find substring in string, treating underscores and hyphens as equivalent
+pub fn indexOfNormalized(haystack: []const u8, needle: []const u8) ?usize {
+    if (needle.len == 0) return 0;
+    if (needle.len > haystack.len) return null;
+
+    var i: usize = 0;
+    while (i <= haystack.len - needle.len) : (i += 1) {
+        if (eqlNormalized(haystack[i..i + needle.len], needle)) {
+            return i;
+        }
+    }
+    return null;
+}
+
+/// Find substring in string case-insensitively, treating underscores and hyphens as equivalent
+pub fn indexOfIgnoreCaseNormalized(haystack: []const u8, needle: []const u8) ?usize {
+    if (needle.len == 0) return 0;
+    if (needle.len > haystack.len) return null;
+
+    var i: usize = 0;
+    while (i <= haystack.len - needle.len) : (i += 1) {
+        if (eqlIgnoreCaseNormalized(haystack[i..i + needle.len], needle)) {
+            return i;
+        }
+    }
+    return null;
+}
 
 /// Multi-Slice Formatter
 /// Note, this is intended for slices of Bytes (`[]const u8`) only.
@@ -131,5 +180,17 @@ pub fn indexOfEql(comptime T: type, haystack: []const T, needle: T) ?usize {
 /// Find the Index of a String (`needle`) within a Slice of Strings `haystack`. (Why is this not in std.mem?!?!? Did I miss it?)
 pub fn indexOfEqlIgnoreCase(haystack: []const []const u8, needle: []const u8) ?usize {
     for (haystack, 0..) |hay, idx| if (ascii.eqlIgnoreCase(hay, needle)) return idx;
+    return null;
+}
+
+/// Find string in array, treating underscores and hyphens as equivalent
+pub fn indexOfEqlNormalized(haystack: []const []const u8, needle: []const u8) ?usize {
+    for (haystack, 0..) |hay, idx| if (eqlNormalized(hay, needle)) return idx;
+    return null;
+}
+
+/// Find string in array case-insensitively, treating underscores and hyphens as equivalent
+pub fn indexOfEqlIgnoreCaseNormalized(haystack: []const []const u8, needle: []const u8) ?usize {
+    for (haystack, 0..) |hay, idx| if (eqlIgnoreCaseNormalized(hay, needle)) return idx;
     return null;
 }
