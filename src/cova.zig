@@ -7,6 +7,9 @@
 // Standard
 const builtin = @import("builtin");
 const std = @import("std");
+const build_options = @import("build_options");
+
+pub const version = build_options.version;
 const ascii = std.ascii;
 const log = std.log.scoped(.cova);
 const mem = std.mem;

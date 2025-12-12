@@ -1,6 +1,15 @@
 const std = @import("std");
 pub const generate = @import("src/generate.zig");
 
+fn getVersion(b: *std.Build) []const u8 {
+    const src_dir = std.fs.path.dirname(@src().file) orelse ".";
+    var exit_code: u8 = 0;
+    const git_hash = b.runAllowFail(&[_][]const u8{
+        "git", "-C", src_dir, "rev-parse", "HEAD",
+    }, &exit_code, .Inherit) catch return "unknown";
+    return std.mem.trim(u8, git_hash, &std.ascii.whitespace);
+}
+
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -13,12 +22,19 @@ pub fn build(b: *std.Build) void {
     const cova_mod = b.addModule("cova", .{
         .root_source_file = b.path("src/cova.zig"),
     });
+
+    const version_options = b.addOptions();
+    version_options.addOption([]const u8, "version", getVersion(b));
+    cova_mod.addOptions("build_options", version_options);
+
     // - Meta Module (for Docs and Tests)
     const cova_meta_mod = b.addModule("cova", .{
         .root_source_file = b.path("src/cova.zig"),
         .target = target,
         .optimize = optimize,
     });
+    cova_meta_mod.addOptions("build_options", version_options);
+
     // - Generator Artifact
     _ = b.addModule("cova_gen", .{
         .root_source_file = b.path("src/generator.zig"),
