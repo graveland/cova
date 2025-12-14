@@ -988,7 +988,7 @@ pub fn Custom(comptime config: Config) type {
             /// Note, for Functions, the Argument Names and Descriptions must be given in the proper Parameter order.
             ///
             /// Format: `.{ "argument_name", "Description of the Argument." }`
-            sub_descriptions: []const struct { []const u8, []const u8 } = &.{ .{ "__nosubdescriptionsprovided__", "" } },
+            sub_descriptions: ?[]const struct { []const u8, []const u8 } = null,
             /// During parsing, mandate that a Sub Command be used with a Command if one is available.
             /// This will not include Usage/Help Commands.
             sub_cmds_mandatory: bool = config.global_sub_cmds_mandatory,
@@ -1044,8 +1044,9 @@ pub fn Custom(comptime config: Config) type {
             const from_vals = from_vals_buf[0..];
             var vals_idx: u8 = 0;
 
-            // TODO: Make this a nullable field and just use null conditional syntax for adding descriptions below.
-            const arg_descriptions = StaticStringMap([]const u8).initComptime(from_config.sub_descriptions);
+            const arg_descriptions = StaticStringMap([]const u8).initComptime(
+                from_config.sub_descriptions orelse &.{},
+            );
 
             const fields = meta.fields(FromT);
             const start_idx = if (from_config.ignore_first) 1 else 0;
@@ -1253,7 +1254,7 @@ pub fn Custom(comptime config: Config) type {
             const from_vals = from_vals_buf[0..];
             var vals_idx: u8 = 0;
 
-            const arg_details = from_config.sub_descriptions; //StaticStringMap([]const u8).initComptime(from_config.sub_descriptions);
+            const arg_details = from_config.sub_descriptions orelse &.{};
 
             const params = from_info.@"fn".params;
             const start_idx = if (from_config.ignore_first) 1 else 0;
@@ -1269,7 +1270,7 @@ pub fn Custom(comptime config: Config) type {
                             var new_config = from_config;
                             new_config.cmd_name = arg_name orelse "cmd-" ++ &.{ cmds_idx + 48 };
                             new_config.cmd_description = arg_description orelse "The '" ++ new_config.cmd_name ++ "' Command.";
-                            new_config.sub_descriptions = &.{ .{ "__nosubdescriptionsprovided__", "" } };
+                            new_config.sub_descriptions = null;
                             break :subConfig new_config;
                         };
                         from_cmds[cmds_idx] = from(param, sub_config);
@@ -1350,8 +1351,21 @@ pub fn Custom(comptime config: Config) type {
         /// - Single-Options: Optional versions of Values.
         /// - Single-Values: Booleans, Integers (Signed/Unsigned), and Pointers (`[]const u8`) only)
         /// - Multi-Options/Values: Arrays of the corresponding Optionals or Values.
-        // TODO: Catch more error cases for Incompatible Types (i.e. Pointer not (`[]const u8`).
         pub fn to(self: *const @This(), comptime ToT: type, to_config: ToConfig) !ToT {
+            // Validate pointer types at comptime - must be []const u8
+            comptime {
+                const fields = meta.fields(ToT);
+                for (fields) |field| {
+                    const f_info = @typeInfo(field.type);
+                    if (f_info == .pointer) {
+                        const p = f_info.pointer;
+                        if (p.size != .slice or p.child != u8) {
+                            @compileError("Field '" ++ field.name ++ "' has pointer type '" ++
+                                @typeName(field.type) ++ "' which is not supported. Only []const u8 pointers are allowed.");
+                        }
+                    }
+                }
+            }
             const alloc = self._alloc orelse return error.CommandNotInitialized;
             const type_info = @typeInfo(ToT);
             if (type_info == .@"union") { 

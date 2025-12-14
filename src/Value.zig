@@ -922,7 +922,7 @@ pub fn Custom(comptime config: Config) type {
                     enum_name = @typeName(FromT);
                     break :EnumT enum_info.tag_type;
                 },
-                // TODO: Check if Pointer is a String.
+                // Pointer validation is done above (line 898): must be []const u8
                 .bool, .int, .float, .pointer => FromT,
                 else => {
                     if (!from_config.ignore_incompatible) @compileError("The comp '" ++ comp_name ++ "' of type '" ++ @typeName(FromT) ++ "' is incompatible.")
