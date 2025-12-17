@@ -525,8 +525,9 @@ fn parseArgsCtx(
                             // Handle Option with normal Argument.
                             else {
                                 parseOpt(args, OptionT, opt) catch {
-                                    if (cmd.allow_inheritable_opts) continue :inheritOpts;
-                                    log.err("Could not parse Option '{s}{s}: {s}'.", .{ 
+                                    // Option was matched but value parsing failed - report error immediately
+                                    // (don't fall through to inherited options since the option exists here)
+                                    log.err("Could not parse Option '{s}{s}: {s}'.", .{
                                         long_pf,
                                         long_name,
                                         opt.name,

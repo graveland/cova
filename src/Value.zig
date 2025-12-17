@@ -294,8 +294,14 @@ pub fn Typed(comptime SetT: type, comptime config: Config) type {
                     for (true_words[0..]) |word| { if (mem.eql(u8, word, san_arg)) break :isTrue true; } else break :isTrue false;
                 },
                 .pointer => arg,
-                .int => parseInt(ChildT, arg, 0),
-                .float => parseFloat(ChildT, arg),
+                .int => parseInt(ChildT, arg, 0) catch |err| {
+                    log.err("Cannot parse '{s}' as {s}: {}", .{ arg, @typeName(ChildT), err });
+                    return error.CannotParseArgToValue;
+                },
+                .float => parseFloat(ChildT, arg) catch |err| {
+                    log.err("Cannot parse '{s}' as {s}: {}", .{ arg, @typeName(ChildT), err });
+                    return error.CannotParseArgToValue;
+                },
                 else => error.CannotParseArgToValue,
             };
         }
