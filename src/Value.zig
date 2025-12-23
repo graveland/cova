@@ -441,107 +441,87 @@ pub fn Generic(comptime config: Config) type {
         f64: Typed(f64, config),
         //f128: Typed(f128, config),
     }
-    // Custom Implementation
-    else customUnion: { 
-        const base_union = union(enum){
-            bool: Typed(bool, config),
-            string: Typed([]const u8, config),
-        };
-        var union_info = @typeInfo(base_union).@"union";
-        var tag_info = @typeInfo(union_info.tag_type.?).@"enum";
-        tag_info.tag_type = usize;
+    // Custom Implementation using @Enum and @Union builtins (Zig 0.16+)
+    else customUnion: {
+        // Calculate total field count based on config
+        const base_count = 2; // bool, string
+        const int_count: usize = if (config.use_custom_bit_width_range)
+            (config.max_int_bit_width - config.min_int_bit_width) * 2
+        else if (config.add_base_ints) 18 else 0;
+        const float_count: usize = if (!config.use_custom_bit_width_range and config.add_base_floats) 3 else 0;
+        const custom_count = config.custom_types.len;
+        const total_count = base_count + int_count + float_count + custom_count;
+
+        // Build arrays for @Enum and @Union
+        var field_names: [total_count][]const u8 = undefined;
+        var field_types: [total_count]type = undefined;
+        var field_attrs: [total_count]Type.UnionField.Attributes = undefined;
+        var field_values: [total_count]usize = undefined;
+
+        var idx: usize = 0;
+
+        // Base fields: bool and string
+        const bool_typed = Typed(bool, config);
+        field_names[idx] = "bool";
+        field_types[idx] = bool_typed;
+        field_attrs[idx] = .{ .@"align" = @alignOf(bool_typed) };
+        field_values[idx] = idx;
+        idx += 1;
+
+        const string_typed = Typed([]const u8, config);
+        field_names[idx] = "string";
+        field_types[idx] = string_typed;
+        field_attrs[idx] = .{ .@"align" = @alignOf(string_typed) };
+        field_values[idx] = idx;
+        idx += 1;
+
+        // Int fields
         if (config.use_custom_bit_width_range) {
             @setEvalBranchQuota(config.max_int_bit_width * 10);
             inline for (config.min_int_bit_width..config.max_int_bit_width) |bit_width| {
-                const uint_name = @typeName(meta.int(.unsigned, bit_width));
                 const uint_type = Typed(meta.int(.unsigned, bit_width), config);
-                union_info.fields = union_info.fields ++ [_]builtin.Type.UnionField{ .{
-                   .name = uint_name,
-                   .type = uint_type,
-                   .alignment = @alignOf(uint_type),
-                } };
-                tag_info.fields = tag_info.fields ++ [_]builtin.Type.UnionField{ .{
-                    .name = uint_name,
-                    .value = tag_info.fields.len
-                } };
+                field_names[idx] = @typeName(meta.int(.unsigned, bit_width));
+                field_types[idx] = uint_type;
+                field_attrs[idx] = .{ .@"align" = @alignOf(uint_type) };
+                field_values[idx] = idx;
+                idx += 1;
 
-                const int_name = @typeName(meta.int(.signed, bit_width));
                 const int_type = Typed(meta.int(.signed, bit_width), config);
-                union_info.fields = union_info.fields ++ [_]builtin.Type.UnionField{ .{
-                   .name = int_name,
-                   .type = int_type,
-                   .alignment = @alignOf(int_type),
-                } };
-                tag_info.fields = tag_info.fields ++ [_]builtin.Type.UnionField{ .{
-                    .name = int_name,
-                    .value = tag_info.fields.len
-                } };
+                field_names[idx] = @typeName(meta.int(.signed, bit_width));
+                field_types[idx] = int_type;
+                field_attrs[idx] = .{ .@"align" = @alignOf(int_type) };
+                field_values[idx] = idx;
+                idx += 1;
             }
-        } //
-        else {
+        } else {
             @setEvalBranchQuota(100_000);
             if (config.add_base_ints) {
-                const int_union = union(enum) {
-                    u1: Typed(u1, config),
-                    u2: Typed(u2, config),
-                    u3: Typed(u3, config),
-                    u4: Typed(u4, config),
-                    u8: Typed(u8, config),
-                    u16: Typed(u16, config),
-                    u32: Typed(u32, config),
-                    u64: Typed(u64, config),
-                    usize: Typed(usize, config),
-                    //u128: Typed(u128, config),
-                    //u256: Typed(u256, config),
-
-                    i1: Typed(i1, config),
-                    i2: Typed(i2, config),
-                    i3: Typed(i3, config),
-                    i4: Typed(i4, config),
-                    i8: Typed(i8, config),
-                    i16: Typed(i16, config),
-                    i32: Typed(i32, config),
-                    i64: Typed(i64, config),
-                    isize: Typed(isize, config),
-                    //i128: Typed(i128, config),
-                    //i256: Typed(i256, config),
-                };
-                const int_info = @typeInfo(int_union).@"union";
-                const int_tag_info = @typeInfo(int_info.tag_type.?).@"enum";
-                union_info.fields = union_info.fields ++ int_info.fields;
-                for (int_tag_info.fields) |tag| {
-                    tag_info.fields = tag_info.fields ++ [_]builtin.Type.EnumField{ .{
-                        .name = tag.name,
-                        .value = tag.value + 2,
-                    } };
+                inline for (.{ u1, u2, u3, u4, u8, u16, u32, u64, usize, i1, i2, i3, i4, i8, i16, i32, i64, isize }) |IntT| {
+                    const typed = Typed(IntT, config);
+                    field_names[idx] = @typeName(IntT);
+                    field_types[idx] = typed;
+                    field_attrs[idx] = .{ .@"align" = @alignOf(typed) };
+                    field_values[idx] = idx;
+                    idx += 1;
                 }
             }
             if (config.add_base_floats) {
-                const float_union = union(enum) {
-                    f16: Typed(f16, config),
-                    f32: Typed(f32, config),
-                    f64: Typed(f64, config),
-                    //f128: Typed(f128, config),
-                };
-                const float_info = @typeInfo(float_union).@"union";
-                const float_tag_info = @typeInfo(float_info.tag_type.?).@"enum";
-                const add_val = if (config.add_base_ints) 20 else 2;
-                union_info.fields = union_info.fields ++ float_info.fields;
-                for (float_tag_info.fields) |tag| {
-                    tag_info.fields = tag_info.fields ++ [_]builtin.Type.EnumField{ .{
-                        .name = tag.name,
-                        .value = tag.value + add_val,
-                    } };
+                inline for (.{ f16, f32, f64 }) |FloatT| {
+                    const typed = Typed(FloatT, config);
+                    field_names[idx] = @typeName(FloatT);
+                    field_types[idx] = typed;
+                    field_attrs[idx] = .{ .@"align" = @alignOf(typed) };
+                    field_values[idx] = idx;
+                    idx += 1;
                 }
             }
         }
 
-        var adds: u16 = 0;
-        for (config.custom_types) |T| {
+        // Custom types
+        inline for (config.custom_types) |T| {
             const AddT = addT: {
                 const add_info = @typeInfo(T);
                 switch (add_info) {
-                    // Check for `Value.Typed`
                     .@"struct" => |struct_info| {
                         const base_fields = @typeInfo(@TypeOf(Typed(bool, config){})).@"struct".fields;
                         if (struct_info.fields.len != base_fields.len) break :addT Typed(T, config);
@@ -550,47 +530,19 @@ pub fn Generic(comptime config: Config) type {
                         }
                         break :addT Typed(T.ChildT, config);
                     },
-                    inline else => break :addT Typed(T, config),
+                    else => break :addT Typed(T, config),
                 }
             };
-            const union_field: Type.UnionField = .{
-               .name = @typeName(AddT.ChildT),
-               .type = AddT,
-               .alignment = @alignOf(AddT),
-            };
-            const union_tag: Type.EnumField = .{
-                .name = @typeName(AddT.ChildT),
-                .value = tag_info.fields.len + adds,
-            };
-            for (union_info.fields, 0..) |field, idx| {
-                if (!mem.eql(u8, field.name, union_field.name)) continue;
-                adds += 1;
-                union_info.fields = rebuildFields: {
-                    var rebuild: [union_info.fields.len]Type.UnionField = undefined;
-                    for (rebuild[0..], union_info.fields, 0..) |*r_fld, o_fld, r_idx| //
-                       r_fld.* = if (r_idx == idx) union_field else o_fld;
-                    const rebuild_out = rebuild;
-                    break :rebuildFields rebuild_out[0..];
-                };
-                tag_info.fields = rebuildFields: {
-                    var rebuild: [tag_info.fields.len]Type.EnumField = undefined;
-                    for (rebuild[0..], tag_info.fields, 0..) |*r_fld, o_fld, r_idx| //
-                       r_fld.* = if (r_idx == idx) union_tag else o_fld;
-                    const rebuild_out = rebuild;
-                    break :rebuildFields rebuild_out[0..];
-                };
-                break;
-            } //
-            else {
-                union_info.fields = union_info.fields ++ [_]builtin.Type.UnionField{ union_field };
-                tag_info.fields = tag_info.fields ++ [_]builtin.Type.EnumField{ union_tag };
-            }
+            field_names[idx] = @typeName(AddT.ChildT);
+            field_types[idx] = AddT;
+            field_attrs[idx] = .{ .@"align" = @alignOf(AddT) };
+            field_values[idx] = idx;
+            idx += 1;
         }
 
-        const tag_info_out = tag_info;
-        union_info.tag_type = @Type(.{ .@"enum" = tag_info_out });
-        const union_info_out = union_info;
-        break :customUnion @Type(.{ .@"union" = union_info_out });
+        // Create the enum tag type and union using new builtins
+        const TagEnum = @Enum(usize, .exhaustive, &field_names, &field_values);
+        break :customUnion @Union(.auto, TagEnum, &field_names, &field_types, &field_attrs);
     };
 }
 

@@ -1583,21 +1583,13 @@ pub fn Custom(comptime config: Config) type {
         /// Prefer to use `checkSubCmd`() and `matchSubCmd`() with conditional `if` statements.
         pub fn SubCommandsEnum(comptime self: *const @This()) ?type {
             if (self.sub_cmds == null) return null; //@compileError("Could not create Sub Commands Enum. This Command has no Sub Commands.");
-            var cmd_fields: [self.sub_cmds.?.len]builtin.Type.EnumField = undefined;
-            for (self.sub_cmds.?, cmd_fields[0..], 0..) |cmd, *field, idx| {
-                field.* = .{
-                    .name = cmd.name,
-                    .value = idx,
-                };
+            var cmd_names: [self.sub_cmds.?.len][]const u8 = undefined;
+            var cmd_values: [self.sub_cmds.?.len]u8 = undefined;
+            for (self.sub_cmds.?, cmd_names[0..], cmd_values[0..], 0..) |cmd, *name, *value, idx| {
+                name.* = cmd.name;
+                value.* = @intCast(idx);
             }
-            return @Type(builtin.Type{
-                .@"enum" = .{
-                    .tag_type = u8,
-                    .fields = cmd_fields[0..],
-                    .decls = &.{},
-                    .is_exhaustive = true,
-                }
-            });
+            return @Enum(u8, .exhaustive, &cmd_names, &cmd_values);
         }
 
         /// Config for the Validation of this Command.
