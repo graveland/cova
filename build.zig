@@ -1,19 +1,9 @@
 const std = @import("std");
 pub const generate = @import("src/generate.zig");
 
-fn getVersion(b: *std.Build) []const u8 {
-    const src_dir = std.fs.path.dirname(@src().file) orelse ".";
-    var exit_code: u8 = 0;
-    const git_hash = b.runAllowFail(&[_][]const u8{
-        "git", "-C", src_dir, "rev-parse", "HEAD",
-    }, &exit_code, .Inherit) catch return "unknown";
-    return std.mem.trim(u8, git_hash, &std.ascii.whitespace);
-}
-
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
-    //const build_options = b.addOptions();
     const bin_name = b.option([]const u8, "name", "A name for the binary being created.");
     b.exe_dir = "./bin";
 
@@ -24,7 +14,7 @@ pub fn build(b: *std.Build) void {
     });
 
     const version_options = b.addOptions();
-    version_options.addOption([]const u8, "version", getVersion(b));
+    version_options.addOption([]const u8, "version", @import("build.zig.zon").version);
     cova_mod.addOptions("build_options", version_options);
 
     // - Meta Module (for Docs and Tests)
