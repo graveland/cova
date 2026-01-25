@@ -107,7 +107,7 @@ pub const RawArgIterator = struct {
 /// A Generic Interface for Argument Iterators.
 pub const ArgIteratorGeneric = union(enum) {
     raw: RawArgIterator,
-    zig: proc.ArgIterator,
+    zig: proc.Args.Iterator,
 
     /// Get the Next argument token and advance this Iterator.
     pub fn next(self: *@This()) ?[:0]const u8 {
@@ -175,9 +175,9 @@ pub const ArgIteratorGeneric = union(enum) {
         else @compileError("The provided Type '" ++ @typeName(iter_type) ++ "' is not supported by the ArgIteratorGeneric Interface.");
     }
 
-    /// Initialize a copy of this Generic Interface as a `std.process.ArgIterator` which is Zig's cross-platform ArgIterator. If needed, this will use the provided Allocator (`alloc`).
-    pub fn init(alloc: mem.Allocator) !@This() {
-        return from(try proc.argsWithAllocator(alloc));
+    /// Initialize a copy of this Generic Interface as a `std.process.Args.Iterator` which is Zig's cross-platform ArgIterator. If needed, this will use the provided Allocator (`alloc`).
+    pub fn init(alloc: mem.Allocator, args: proc.Args) !@This() {
+        return from(try args.iterateAllocator(alloc));
     }
 
     /// De-initialize a copy of this Generic Interface made with `init()`.
