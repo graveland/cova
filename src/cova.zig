@@ -175,7 +175,7 @@ pub const ArgIteratorGeneric = struct {
     /// Create a copy of this Generic Interface from the provided ArgIterator (`arg_iter`).
     pub fn from(arg_iter: anytype) @This() {
         const iter_type = @TypeOf(arg_iter);
-        const inner = comptime genIter: inline for (meta.fields(Inner)) |field| {
+        const inner = comptime genIter: for (meta.fields(Inner)) |field| {
             if (field.type == iter_type) break :genIter field.name;
         } else @compileError("The provided Type '" ++ @typeName(iter_type) ++ "' is not supported by the ArgIteratorGeneric Interface.");
         return .{ .inner = @unionInit(Inner, inner, arg_iter), .pos = 0 };
