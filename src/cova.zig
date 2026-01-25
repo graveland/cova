@@ -105,74 +105,80 @@ pub const RawArgIterator = struct {
 };
 
 /// A Generic Interface for Argument Iterators.
-pub const ArgIteratorGeneric = union(enum) {
-    raw: RawArgIterator,
-    zig: proc.Args.Iterator,
+pub const ArgIteratorGeneric = struct {
+    inner: Inner,
+    pos: usize = 0,
+
+    const Inner = union(enum) {
+        raw: RawArgIterator,
+        zig: proc.Args.Iterator,
+    };
 
     /// Get the Next argument token and advance this Iterator.
     pub fn next(self: *@This()) ?[:0]const u8 {
-        return switch (meta.activeTag(self.*)) {
-            inline else => |tag| @field(self, @tagName(tag)).next(),
+        const result = switch (meta.activeTag(self.inner)) {
+            inline else => |tag| @field(self.inner, @tagName(tag)).next(),
         };
+        if (result != null) self.pos += 1;
+        return result;
     }
 
     /// Peek at the next argument token without advancing this Iterator.
     pub fn peek(self: *@This()) ?[:0]const u8 {
-        switch (meta.activeTag(self.*)) {
-            .raw => return self.raw.peek(),
-            inline else => |tag| {
-                var iter = @field(self, @tagName(tag));
-                // TODO: Create a PR for this in `std.process`?
-                if (builtin.os.tag != .windows) {
-                    const peek_arg = iter.next();
-                    iter.inner.index -= 1;
+        switch (meta.activeTag(self.inner)) {
+            .raw => return self.inner.raw.peek(),
+            .zig => {
+                // Save iterator state, peek, then restore
+                if (builtin.os.tag == .windows) {
+                    const iter_idx = self.inner.zig.inner.index;
+                    const iter_start = self.inner.zig.inner.start;
+                    const iter_end = self.inner.zig.inner.end;
+                    const peek_arg = self.inner.zig.next();
+                    self.inner.zig.inner.index = iter_idx;
+                    self.inner.zig.inner.start = iter_start;
+                    self.inner.zig.inner.end = iter_end;
+                    return peek_arg;
+                } else {
+                    // Posix/Wasi: save remaining slice, get next, restore
+                    const saved_remaining = self.inner.zig.inner.remaining;
+                    const peek_arg = self.inner.zig.next();
+                    self.inner.zig.inner.remaining = saved_remaining;
                     return peek_arg;
                 }
-                else {
-                    const iter_idx = iter.inner.index;
-                    const iter_start = iter.inner.start;
-                    const iter_end = iter.inner.end;
-                    const peek_arg = iter.next();
-                    iter.inner.index = iter_idx; 
-                    iter.inner.start = iter_start; 
-                    iter.inner.end = iter_end; 
-                    return peek_arg;
-                } 
             },
         }
     }
 
     /// Reset this Argument Iterator.
     pub fn reset(self: *@This()) void {
-        switch (meta.activeTag(self.*)) {
-            .raw => self.raw.index = 0,
-            inline else => |tag| {
-                var iter = &@field(self, @tagName(tag));
-                if (builtin.os.tag != .windows) iter.inner.index = 0
-                else {
-                    iter.inner.index = 0; 
-                    iter.inner.start = 0; 
-                    iter.inner.end = 0; 
-                } 
+        // Note: Full reset is not supported for all iterator types.
+        // This resets our tracked position but may not fully reset the underlying iterator.
+        self.pos = 0;
+        switch (meta.activeTag(self.inner)) {
+            .raw => self.inner.raw.index = 0,
+            .zig => {
+                if (builtin.os.tag == .windows) {
+                    self.inner.zig.inner.index = 0;
+                    self.inner.zig.inner.start = 0;
+                    self.inner.zig.inner.end = 0;
+                }
+                // For Posix, we can't easily reset the remaining slice without original data
             },
         }
     }
 
     /// Get the current Index of this Iterator.
-    pub fn index(self: *@This()) usize {
-        return switch (meta.activeTag(self.*)) {
-            .raw => self.raw.index,
-            .zig => self.zig.inner.index,
-        };
+    pub fn index(self: *const @This()) usize {
+        return self.pos;
     }
-    
+
     /// Create a copy of this Generic Interface from the provided ArgIterator (`arg_iter`).
     pub fn from(arg_iter: anytype) @This() {
         const iter_type = @TypeOf(arg_iter);
-        return genIter: inline for (meta.fields(@This())) |field| {
-            if (field.type == iter_type) break :genIter @unionInit(@This(), field.name, arg_iter);
-        }
-        else @compileError("The provided Type '" ++ @typeName(iter_type) ++ "' is not supported by the ArgIteratorGeneric Interface.");
+        const inner = comptime genIter: inline for (meta.fields(Inner)) |field| {
+            if (field.type == iter_type) break :genIter field.name;
+        } else @compileError("The provided Type '" ++ @typeName(iter_type) ++ "' is not supported by the ArgIteratorGeneric Interface.");
+        return .{ .inner = @unionInit(Inner, inner, arg_iter), .pos = 0 };
     }
 
     /// Initialize a copy of this Generic Interface as a `std.process.Args.Iterator` which is Zig's cross-platform ArgIterator. If needed, this will use the provided Allocator (`alloc`).
@@ -182,7 +188,7 @@ pub const ArgIteratorGeneric = union(enum) {
 
     /// De-initialize a copy of this Generic Interface made with `init()`.
     pub fn deinit(self: *@This()) void {
-        if (meta.activeTag(self.*) == .zig) self.zig.deinit();
+        if (meta.activeTag(self.inner) == .zig) self.inner.zig.deinit();
         return;
     }
 };
